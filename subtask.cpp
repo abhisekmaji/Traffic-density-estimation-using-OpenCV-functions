@@ -11,15 +11,20 @@ void callBackFunc(int event, int x, int y, int flags, void* userdata)
 }
 
 int main(int argc, char** argv){
-
+    
+    \\read the Image
     Mat imsrc = imread("empty.jpg");
+    
+    \\check if the Image has loaded or not
     if (imsrc.empty()){
         cout<<"Image not loaded"<<endl;
         return -1;
     }
-
+    Mat gray_img;
+    cvtcolor(imsrc,gray_img,COLOR_BGR2GRAY);
+    
     namedWindow("Win", 1);
-
+    imshow("Win",gray_img);
 
 
     vector<Point2f> src_points;
