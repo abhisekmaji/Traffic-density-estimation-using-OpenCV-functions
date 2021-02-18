@@ -1,6 +1,7 @@
 #include "opencv2/opencv.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include <iostream>
+#include <vector>
 
 using namespace cv;
 using namespace std;
@@ -8,11 +9,11 @@ using namespace std;
 
 vector<Point2f> src_points; // Global Variable
 
-void callBackFunc(int event, int x, int y, int flags, void* userdata)
+void onMouseClick(int event, int x, int y, int flags, void* userdata)
 {
     //capture points if left button pressed wiht control key pressed
     if( flags == (EVENT_FLAG_CTRLKEY + EVENT_FLAG_LBUTTON) ){
-        src_points.pushback(x,y);
+        src_points.push_back(Point2f(x,y));
         cout<< "coordinate- ("<< x <<","<< y << ")"<< endl;
     }
 }
@@ -30,7 +31,7 @@ int main(int argc, char** argv){
     
     // converting the colored image to grayscale 
     Mat gray_img;
-    cvtcolor(imsrc,gray_img,COLOR_BGR2GRAY);
+    cvtColor(imsrc,gray_img,COLOR_BGR2GRAY);
     
     namedWindow("Win", 1);
     imshow("Win",gray_img);
@@ -45,15 +46,15 @@ int main(int argc, char** argv){
     cout<<"bottom-right"<<endl;
     cout<<"top-right"<<endl;
     
-    while(src_points.szie()<4){
+    while(src_points.size()<4){
         setMouseCallback("Win",onMouseClick,0);
     }
     
     vector<Point2f> dst_points;
-    dst_points.pushback(472,52);
-    dst_points.pushback(472,832);
-    dst_points.pushback(800,830);
-    dst_points.pushback(800,52);
+    dst_points.push_back(Point2f(472,52));
+    dst_points.push_back(Point2f(472,832));
+    dst_points.push_back(Point2f(800,830));
+    dst_points.push_back(Point2f(800,52));
     
     Mat homography = findHomography(src_points,dst_points);
     Mat im_out;
@@ -82,7 +83,7 @@ int main(int argc, char** argv){
         cout<<"Image could not be saved"<<endl;
     }
 
-    waitkey(0);
+    waitKey(0);
 
     destroyAllWindows();    
     return 0;
