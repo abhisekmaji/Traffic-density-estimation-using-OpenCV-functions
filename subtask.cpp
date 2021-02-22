@@ -16,12 +16,23 @@ void onMouseClick(int event, int x, int y, int flags, void* userdata)
         src_points.push_back(Point2f(x,y));
         cout<< "coordinate- ("<< x <<","<< y << ")"<< endl;
     }
+    if(src_points.size() ==4){
+        destroyWindow("Win");
+        return;
+    }
 }
 
 int main(int argc, char** argv){
     
+    if(argv[1]==NULL){
+        cout<<"enter the image to be processed"<<endl;
+        return 0;
+    }
+    string img_path = argv[1];
+    string final_path = img_path + ".jpg";
+    
     //read the Image
-    Mat imsrc = imread("empty.jpg");
+    Mat imsrc = imread(final_path);
     
     //check if the Image has loaded or not
     if (imsrc.empty()){
@@ -32,8 +43,9 @@ int main(int argc, char** argv){
     // converting the colored image to grayscale 
     Mat gray_img;
     cvtColor(imsrc,gray_img,COLOR_BGR2GRAY);
-    
-    namedWindow("Win", WINDOW_AUTOSIZE);
+    //resize(gray_img,gray_img,Size(gray_img.cols/3,gray_img.rows/3));
+    namedWindow("Win",0);
+    resizeWindow("Win",1000,1000);
     imshow("Win", gray_img);
     
     
@@ -63,8 +75,10 @@ int main(int argc, char** argv){
     Mat im_out;
 
     warpPerspective(gray_img,im_out,homography,gray_img.size());
-    
+    //resize(im_out,im_out,Size(im_out.cols/3,im_out.rows/3));
     //show the image projected
+    namedWindow("projected image",0);
+    resizeWindow("projected image",1000,1000);
     imshow("projected image",im_out);
     //save the projected image
     bool check1 = imwrite("projected.jpg",im_out);
@@ -72,6 +86,7 @@ int main(int argc, char** argv){
         cout<<"Image could not be saved"<<endl;
     }
     waitKey(0);
+    destroyWindow("projected image");
 
     //croping the image
     int top_left_x = 472;
@@ -80,7 +95,8 @@ int main(int argc, char** argv){
     int height = 830 - 52;
     Rect cropped_img(top_left_x,top_left_y,width,height);
     Mat im_crop = im_out(cropped_img);
-
+    namedWindow("cropped image",0);
+    resizeWindow("cropped image",500,500);
     //show the image cropped 
     imshow("cropped image",im_crop);
     bool check2 = imwrite("cropped.jpg",im_crop);
