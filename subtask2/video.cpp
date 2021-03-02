@@ -16,46 +16,36 @@ void onMouseClick(int event, int x, int y, int flags, void* userdata)
         src_points.push_back(Point2f(x,y));
         cout<< "coordinate- ("<< x <<","<< y << ")"<< endl;
     }
-    if(src_points.size() ==4){
+    if(src_points.size() == 4){
         destroyWindow("Win");
         return;
     }
 }
 
-void setPoints(){
-    
+void setPoints(){    
     //set the area of interest for the frame to be proojected and cropped
 
-    Mat imsrc = imread(final_path);
-    
+    Mat imsrc = imread("empty.jpg");    
     //check if the Image has loaded or not
     if (imsrc.empty()){
         cout<<"Image not loaded"<<endl;
-        return -1;
+        return;
     }
-
     // converting the colored image to grayscale 
     Mat gray_img;
     cvtColor(imsrc,gray_img,COLOR_BGR2GRAY);
     //resize(gray_img,gray_img,Size(gray_img.cols/3,gray_img.rows/3));
     namedWindow("Win",0);
     resizeWindow("Win",1000,1000);
-    imshow("Win", gray_img);
-    
-    
-    //projecting the grayscaled image to the required image 
-    
-    
-    //give the instructions to click the points
-    
+    imshow("Win", gray_img);     
+    //give the instructions to click the points    
     cout<<"click 4 points on Win "<<endl;
     cout<<"top-left"<<endl;
     cout<<"bottom-left"<<endl;
     cout<<"bottom-right"<<endl;
     cout<<"top-right"<<endl;
-    
-
     setMouseCallback("Win",onMouseClick,0);
+    return;
 }
 
 Mat project_crop(Mat imsrc){
@@ -85,28 +75,33 @@ Mat project_crop(Mat imsrc){
 }
 
 int main(int argc, char** argv){
+
     if(argv[1]==NULL){
         cout<<"enter the image to be processed"<<endl;
         return 0;
     }
     string vid_path = argv[1];
     string final_path = vid_path + ".mp4";
-    
     VideoCapture cap(final_path);
     // Check if camera opened successfully
     if(!cap.isOpened()){
         cout << "Could not open the video file" << endl;
         return -1;
     }
+    
+    //set the projection points
+    setPoints();
 
+    Mat frame, cropped;
     while(1){
-        Mat frame;
         cap >> frame;
         if(frame.empty()){
             break;
         }
-        Mat croped = project_crop(frame);
-        imshow("frame", frame);
+        //correction of camera anlge and cropping        
+        cropped = project_crop(frame);
+
+        imshow("frame", cropped);
         char c = (char)waitkey(25);
         if(c==q||c=27){
             break;
