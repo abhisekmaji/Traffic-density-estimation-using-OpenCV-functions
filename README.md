@@ -1,2 +1,3 @@
 # Traffic-density-estimation-using-OpenCV-functions
-camera angle correction and frame cropping
+subtask1: camera angle correction and frame cropping
+subtask2: calculating the queue density and moving density in a video
