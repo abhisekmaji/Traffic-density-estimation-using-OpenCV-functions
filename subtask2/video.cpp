@@ -37,7 +37,8 @@ void setPoints(){
     //resize(gray_img,gray_img,Size(gray_img.cols/3,gray_img.rows/3));
     namedWindow("Win",0);
     resizeWindow("Win",1000,1000);
-    imshow("Win", gray_img);     
+    imshow("Win", gray_img);
+         
     //give the instructions to click the points    
     cout<<"click 4 points on Win "<<endl;
     cout<<"top-left"<<endl;
@@ -45,6 +46,7 @@ void setPoints(){
     cout<<"bottom-right"<<endl;
     cout<<"top-right"<<endl;
     setMouseCallback("Win",onMouseClick,0);
+    waitKey(0);
     return;
 }
 
@@ -91,7 +93,8 @@ int main(int argc, char** argv){
     
     //set the projection points
     setPoints();
-
+    namedWindow("frame",0);
+    resizeWindow("frame",200,600);
     Mat frame, cropped;
     while(1){
         cap >> frame;
@@ -102,8 +105,8 @@ int main(int argc, char** argv){
         cropped = project_crop(frame);
 
         imshow("frame", cropped);
-        char c = (char)waitkey(25);
-        if(c==q||c=27){
+        char c = (char)waitKey(25);
+        if(c=='q'||c==27){
             break;
         }
     }
