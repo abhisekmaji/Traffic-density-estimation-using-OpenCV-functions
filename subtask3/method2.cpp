@@ -101,10 +101,10 @@ void setPoints(Mat imgsrc){
 
 /*-------------------------------------------------
 | Function to correct the camera angle and crop   |
-| the image.                                      |
+| the image and reduce the resolutions.           |
 --------------------------------------------------*/
 
-Mat project_crop(Mat imsrc){
+Mat project_crop_resizing(Mat imsrc , float factor){
     Mat gray_img;
     cvtColor(imsrc,gray_img,COLOR_BGR2GRAY);
     
@@ -126,7 +126,9 @@ Mat project_crop(Mat imsrc){
     int height = 830 - 52;
     Rect cropped_img(top_left_x, top_left_y, width, height);
     Mat im_crop = im_out(cropped_img);
-    return im_crop;
+    Mat dst;
+    resize(im_crop, dst, Size(), factor, factor, interpolation);
+    return dst;
 }
 
 
@@ -144,6 +146,7 @@ int main(int argc, char** argv){
     }
     string vid_path = argv[1];
     int sampling = argv[2];
+    float factor = 1/(sampling * 1.0);
     string final_path = vid_path + ".mp4";
     VideoCapture cap(final_path);
     
@@ -163,14 +166,15 @@ int main(int argc, char** argv){
     
     /*set the 4 coordinates*/
     setPoints(empty);
-    empty = project_crop(empty);
-    prev = project_crop(prev);
+    empty = project_crop_resizing(empty);
+    prev = project_crop_resizing(prev);
     namedWindow("frame",0);
     resizeWindow("frame",300,500);
     
-    int time = 1;
+    //int time = 1;
     int k = 0;
-    int cnt = 0;
+    //int cnt = 0;
+    float error = 0.0;
 
     while(k<1000000){
         // capture new frame
@@ -178,40 +182,28 @@ int main(int argc, char** argv){
         if(frame.empty()) break;
         
         //correction of camera anlge and cropping        
-        cropped = project_crop(frame);
+        cropped = project_crop_resizing(frame);
+           
+        Mat dst;
+        absdiff(cropped,empty,dst);
+        ul mag = cal_magnitude(dst);
+        float mag1 = (mag*1.0)/(mag_g*1.0);
+        a[k] = mag1;
 
-        if(cnt == 15){
+        //Estimate Dynamic Density
+        Mat dst_;
+        absdiff(cropped,prev,dst_);
+        ul mag_ = cal_magnitude(dst_);
+        float mag_1 = (mag_*1.0)/(mag_g*1.0);
+        b[k] = mag_1;
 
-            //Estimate Queue Density            
-            Mat dst;
-            absdiff(cropped,empty,dst);
-            ul mag = cal_magnitude(dst);
-            float mag1 = (mag*1.0)/(mag_g*1.0);
-            a[k] = mag1;
-
-            //Estimate Dynamic Density
-            Mat dst_;
-            absdiff(cropped,prev,dst_);
-            ul mag_ = cal_magnitude(dst_);
-            float mag_1 = (mag_*1.0)/(mag_g*1.0);
-            b[k] = mag_1;
-
-            prev = cropped;
-            k++;
-            //time = k;
-            cnt = 0;
-            /*dispaly out the time, Queue Density, Dynamic Density*/
-            //cout<<time<<","<<a[k-1]<<","<<b[k-1]<< "\n";
-        }
-        else cnt++;
-
-        /*display new cropped frame*/
-        imshow("frame", cropped);
-        char c = (char)waitKey(25);
-        if(c=='q'||c==27){
-            break;
-        }
+        error +=abs(a[k]-b[k]);
+        prev = cropped;
+        k++;
     }
+
+    float mean_error = error/(k*1.0);
+    cout<<mean_error<<"\n";
 
     /*project the data to a csv file to plot the graph*/
     ofstream myfile("out.txt");
