@@ -6,22 +6,23 @@
 #include <vector>
 #include <fstream>
 #include <unistd.h>
+#include <cstdlib>
+#include <chrono>
 
 using namespace cv;
 using namespace std;
+using namespace std::chrono;
 
 /*------------Global variables-----------------*/
 #define ul unsigned long
 #define ARRAY_SIZE 10000
 
 float* a;       //to store the queue density
-float* b;       //to store the dynamic density
 unsigned long mag_g = 0;
 
 /* Initializing the array */
 void init(){ 
     a = (float *)malloc(sizeof(float)*ARRAY_SIZE);
-    b = (float *)malloc(sizeof(float)*ARRAY_SIZE);
 }
 
 vector<Point2f> src_points; //to store 4-coordinates
@@ -104,16 +105,12 @@ void setPoints(Mat imgsrc){
 | the image.                                      |
 --------------------------------------------------*/
 
-Mat project_crop(Mat imsrc){
+Mat project_crop(Mat imsrc,vector<Point2f> &dst_points){
     Mat gray_img;
     cvtColor(imsrc,gray_img,COLOR_BGR2GRAY);
     
     //projecting the grayscaled image to the required image     
-    vector<Point2f> dst_points;
-    dst_points.push_back(Point2f(472,52));
-    dst_points.push_back(Point2f(472,832));
-    dst_points.push_back(Point2f(800,830));
-    dst_points.push_back(Point2f(800,52));
+    
     
     Mat homography = findHomography(src_points, dst_points);
     Mat im_out;
@@ -146,7 +143,8 @@ int main(int argc, char** argv){
     string final_path = vid_path + ".mp4";
     VideoCapture cap(final_path);
     
-    int gap = argv[2];
+    char *arg2 = argv[2];
+    int gap = atoi(arg2); 
 
     /*check if camera opened successfully*/
     if(!cap.isOpened()){
@@ -155,24 +153,28 @@ int main(int argc, char** argv){
     }
     
     /*set the projection points*/
-    Mat frame, cropped, empty, prev;
+    Mat frame, cropped, empty;//, prev;
     cap >> empty;
     if(empty.empty()) return -1;
-
-    cap >> prev;
-    if(prev.empty()) return -1;
     
     /*set the 4 coordinates*/
     setPoints(empty);
-    empty = project_crop(empty);
-    prev = project_crop(prev);
+
+    vector<Point2f> dst_points;
+    dst_points.push_back(Point2f(472,52));
+    dst_points.push_back(Point2f(472,832));
+    dst_points.push_back(Point2f(800,830));
+    dst_points.push_back(Point2f(800,52));
+
+    empty = project_crop(empty,dst_points);
     namedWindow("frame",0);
     resizeWindow("frame",300,500);
     
     //int time = 1;
     int k = 0;
     int cnt = 0;
-    float error = 0.0;
+
+    auto start = high_resolution_clock::now();
 
     while(k<1000000){
         // capture new frame
@@ -180,34 +182,25 @@ int main(int argc, char** argv){
         if(frame.empty()) break;
         
         //correction of camera anlge and cropping        
-        cropped = project_crop(frame);
+        cropped = project_crop(frame,dst_points);
 
-        if(cnt == 0){
+        if(cnt==0 || cnt==gap){
 
             //Estimate Queue Density            
             Mat dst;
             absdiff(cropped,empty,dst);
             ul mag = cal_magnitude(dst);
-            float mag1 = (mag*1.0)/(mag_g*1.0);
+            float mag1 = (mag*1.0f)/(mag_g*1.0f);
             a[k] = mag1;
 
-            //Estimate Dynamic Density
-            Mat dst_;
-            absdiff(cropped,prev,dst_);
-            ul mag_ = cal_magnitude(dst_);
-            float mag_1 = (mag_*1.0)/(mag_g*1.0);
-            b[k] = mag_1;
-
-            prev = cropped;
+            cnt = 1;
             /*dispaly out the time, Queue Density, Dynamic Density*/
             //cout<<time<<","<<a[k-1]<<","<<b[k-1]<< "\n";
         }
         else{
-            a[k]=a[k-1];
-            b[k]=b[k-1];                        
-        }
-        error+=abs(a[k]-b[k]);
-        cnt = (cnt+1) % gap;
+            a[k]=a[k-1];                     
+            cnt += 1;
+        }       
         k++;
         
         /*display new cropped frame*/
@@ -218,24 +211,35 @@ int main(int argc, char** argv){
             break;
         }
         */
+        
     }
-    
-    float mean_error = error/(k*1.0);
-    cout<<mean_error<<"\n";
+
+    auto stop = high_resolution_clock::now();
+    duration<float> fs = (stop - start);
+    cout << fs.count()<<"\n";
 
     /*project the data to a csv file to plot the graph*/
-    ofstream myfile("out.txt");
-    if (myfile.is_open())
+    ofstream myfile1("m1.csv");
+    if (myfile1.is_open())
     {
-        myfile << "Time(in sec)," <<"Queue_density,"<<"dynamic density"<<"\n";
+        myfile1 << "Frames" <<"Queue_density,"<<"\n";
         for(int count = 0; count < k; count++){
-            myfile <<(count+1)<<"\t"<<a[count]<<"    \t"<<b[count]<< "\n";
+            myfile1 <<(count+1)<<","<<a[count]<< "\n";
         }
-        myfile.close();
+        myfile1.close();
+    }
+    else cout << "Unable to open file";
+
+    ofstream myfile2("m1.txt");
+    if (myfile2.is_open())
+    {
+        for(int count = 0; count < k; count++){
+            myfile2 <<a[count]<< "\n";
+        }
+        myfile2.close();
     }
     else cout << "Unable to open file";
 
     free(a);
-    free(b);
     return 0;
 }

@@ -6,22 +6,22 @@
 #include <vector>
 #include <fstream>
 #include <unistd.h>
+#include <chrono>
 
 using namespace cv;
 using namespace std;
+using namespace std::chrono;
 
 /*------------Global variables-----------------*/
 #define ul unsigned long
 #define ARRAY_SIZE 10000
 
 float* a;       //to store the queue density
-float* b;       //to store the dynamic density
 unsigned long mag_g = 0;
 
 /* Initializing the array */
 void init(){ 
     a = (float *)malloc(sizeof(float)*ARRAY_SIZE);
-    b = (float *)malloc(sizeof(float)*ARRAY_SIZE);
 }
 
 vector<Point2f> src_points; //to store 4-coordinates
@@ -34,15 +34,15 @@ vector<Point2f> src_points; //to store 4-coordinates
 | applying threshold                               |
 --------------------------------------------------*/
 
-ul cal_magnitude(Mat diff){
+ul cal_magnitude(Mat diff, int gap){
     mag_g = 0;
     float threshold = 30.0f;
     float dist;
 
     ul mag = 0;
 
-    for(int i=0; i<diff.rows; ++i)
-        for(int j=0; j<diff.cols; ++j)
+    for(int i=0; i<diff.rows; i=i+gap)
+        for(int j=0; j<diff.cols; j=j+gap)
         {
             Vec3b pixelMatrix = diff.at<Vec3b>(i,j);
             dist = sqrt(pixelMatrix[0]*pixelMatrix[0]+pixelMatrix[1]*pixelMatrix[1]+pixelMatrix[2]*pixelMatrix[2]);
@@ -104,17 +104,12 @@ void setPoints(Mat imgsrc){
 | the image and reduce the resolutions.           |
 --------------------------------------------------*/
 
-Mat project_crop_resizing(Mat imsrc , float factor){
+Mat project_crop(Mat imsrc , vector<Point2f> &dst_points){
+    
     Mat gray_img;
     cvtColor(imsrc,gray_img,COLOR_BGR2GRAY);
     
-    //projecting the grayscaled image to the required image     
-    vector<Point2f> dst_points;
-    dst_points.push_back(Point2f(472,52));
-    dst_points.push_back(Point2f(472,832));
-    dst_points.push_back(Point2f(800,830));
-    dst_points.push_back(Point2f(800,52));
-    
+    //projecting the grayscaled image to the required image    
     Mat homography = findHomography(src_points, dst_points);
     Mat im_out;
     warpPerspective(gray_img, im_out, homography, gray_img.size());
@@ -126,9 +121,10 @@ Mat project_crop_resizing(Mat imsrc , float factor){
     int height = 830 - 52;
     Rect cropped_img(top_left_x, top_left_y, width, height);
     Mat im_crop = im_out(cropped_img);
-    Mat dst;
-    resize(im_crop, dst, Size(), factor, factor, interpolation);
-    return dst;
+
+    //resizing the image
+    //resize(im_crop, dst, Size(), factor, factor, INTER_LANCZOS4);
+    return im_crop;
 }
 
 
@@ -145,10 +141,11 @@ int main(int argc, char** argv){
         return 0;
     }
     string vid_path = argv[1];
-    int sampling = argv[2];
-    float factor = 1/(sampling * 1.0);
     string final_path = vid_path + ".mp4";
     VideoCapture cap(final_path);
+
+    char *arg2 = argv[2];
+    int sampling = atoi(arg2);
     
     /*check if camera opened successfully*/
     if(!cap.isOpened()){
@@ -157,67 +154,76 @@ int main(int argc, char** argv){
     }
     
     /*set the projection points*/
-    Mat frame, cropped, empty, prev;
+    Mat frame, cropped, empty;//, prev;
     cap >> empty;
     if(empty.empty()) return -1;
-
-    cap >> prev;
-    if(prev.empty()) return -1;
     
     /*set the 4 coordinates*/
     setPoints(empty);
-    empty = project_crop_resizing(empty);
-    prev = project_crop_resizing(prev);
+
+    vector<Point2f> dst_points;
+    dst_points.push_back(Point2f(472,52));
+    dst_points.push_back(Point2f(472,832));
+    dst_points.push_back(Point2f(800,830));
+    dst_points.push_back(Point2f(800,52));
+
+    empty = project_crop(empty,dst_points);
     namedWindow("frame",0);
     resizeWindow("frame",300,500);
-    
-    //int time = 1;
-    int k = 0;
-    //int cnt = 0;
-    float error = 0.0;
 
+    int k = 0;
+
+    auto start = high_resolution_clock::now();
+    
     while(k<1000000){
         // capture new frame
         cap >> frame;
         if(frame.empty()) break;
         
         //correction of camera anlge and cropping        
-        cropped = project_crop_resizing(frame);
+        cropped = project_crop(frame,dst_points);
            
         Mat dst;
         absdiff(cropped,empty,dst);
-        ul mag = cal_magnitude(dst);
+        ul mag = cal_magnitude(dst,sampling);
         float mag1 = (mag*1.0)/(mag_g*1.0);
         a[k] = mag1;
-
-        //Estimate Dynamic Density
-        Mat dst_;
-        absdiff(cropped,prev,dst_);
-        ul mag_ = cal_magnitude(dst_);
-        float mag_1 = (mag_*1.0)/(mag_g*1.0);
-        b[k] = mag_1;
-
-        error +=abs(a[k]-b[k]);
-        prev = cropped;
         k++;
+        /*
+        imshow("frame", cropped);
+        char c = (char)waitKey(25);
+        if(c=='q'||c==27){
+            break;
+        }
+        */
     }
 
-    float mean_error = error/(k*1.0);
-    cout<<mean_error<<"\n";
+    auto stop = high_resolution_clock::now();
+    duration<float> fs = (stop - start);
+    cout << fs.count()<<"\n";
 
     /*project the data to a csv file to plot the graph*/
-    ofstream myfile("out.txt");
-    if (myfile.is_open())
+    ofstream myfile1("m2.csv");
+    if (myfile1.is_open())
     {
-        myfile << "Time(in sec)," <<"Queue_density,"<<"dynamic density"<<"\n";
+        myfile1 << "Frames" <<"Queue_density,"<<"\n";
         for(int count = 0; count < k; count++){
-            myfile <<(count+1)<<"\t"<<a[count]<<"    \t"<<b[count]<< "\n";
+            myfile1 <<(count+1)<<","<<a[count]<< "\n";
         }
-        myfile.close();
+        myfile1.close();
+    }
+    else cout << "Unable to open file";
+
+    ofstream myfile2("m2.txt");
+    if (myfile2.is_open())
+    {
+        for(int count = 0; count < k; count++){
+            myfile2 <<a[count]<< "\n";
+        }
+        myfile2.close();
     }
     else cout << "Unable to open file";
 
     free(a);
-    free(b);
     return 0;
 }

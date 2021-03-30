@@ -6,22 +6,22 @@
 #include <vector>
 #include <fstream>
 #include <unistd.h>
+#include <chrono>
 
 using namespace cv;
 using namespace std;
+using namespace std::chrono;
 
 /*------------Global variables-----------------*/
 #define ul unsigned long
 #define ARRAY_SIZE 10000
 
 float* a;       //to store the queue density
-float* b;       //to store the dynamic density
 unsigned long mag_g = 0;
 
 /* Initializing the array */
 void init(){ 
     a = (float *)malloc(sizeof(float)*ARRAY_SIZE);
-    b = (float *)malloc(sizeof(float)*ARRAY_SIZE);
 }
 
 vector<Point2f> src_points; //to store 4-coordinates
@@ -153,24 +153,19 @@ int main(int argc, char** argv){
     }
     
     /*set the projection points*/
-    Mat frame, cropped, empty, prev;
+    Mat frame, cropped, empty;//, prev;
     cap >> empty;
     if(empty.empty()) return -1;
-
-    cap >> prev;
-    if(prev.empty()) return -1;
     
     /*set the 4 coordinates*/
     setPoints(empty);
     empty = project_crop(empty);
-    prev = project_crop(prev);
     namedWindow("frame",0);
     resizeWindow("frame",300,500);
     
-    //int time = 1;
     int k = 0;
-    //int cnt = 0;
-    float error = 0.0;
+
+    auto start = high_resolution_clock::now(); 
 
     while(k<1000000){
         // capture new frame
@@ -180,56 +175,52 @@ int main(int argc, char** argv){
         //correction of camera anlge and cropping        
         cropped = project_crop(frame);
 
-        //if(cnt == 1){
-
-            //Estimate Queue Density            
+        //Estimate Queue Density            
         Mat dst;
         absdiff(cropped,empty,dst);
         ul mag = cal_magnitude(dst);
         float mag1 = (mag*1.0)/(mag_g*1.0);
         a[k] = mag1;
 
-        //Estimate Dynamic Density
-        Mat dst_;
-        absdiff(cropped,prev,dst_);
-        ul mag_ = cal_magnitude(dst_);
-        float mag_1 = (mag_*1.0)/(mag_g*1.0);
-        b[k] = mag_1;
-
-        error +=abs(a[k]-b[k]);
-        prev = cropped;
         k++;
-            //time = k;
-            //cnt = 0;
-            /*dispaly out the time, Queue Density, Dynamic Density*/
-            //cout<<time<<","<<a[k-1]<<","<<b[k-1]<< "\n";
-        //}
-        //else cnt++;
-
+        
         /*display new cropped frame*/
-        /*imshow("frame", cropped);
+        /*
+        imshow("frame", cropped);
         char c = (char)waitKey(25);
         if(c=='q'||c==27){
             break;
-        }*/
+        }
+        */
     }
 
-    float mean_error = error/(k*1.0);
-    cout<<mean_error<<"\n";
+    auto stop = high_resolution_clock::now();
+    duration<float> fs = (stop - start);
+    cout << fs.count()<<"\n";
+
 
     /*project the data to a csv file to plot the graph*/
-    ofstream myfile("out.txt");
-    if (myfile.is_open())
+    ofstream myfile1("base.csv");
+    if (myfile1.is_open())
     {
-        myfile << "Time(in sec)," <<"Queue_density,"<<"dynamic density"<<"\n";
+        myfile1 << "Frames" <<"Queue_density,"<<"\n";
         for(int count = 0; count < k; count++){
-            myfile <<(count+1)<<"\t"<<a[count]<<"    \t"<<b[count]<< "\n";
+            myfile1 <<(count+1)<<","<<a[count]<< "\n";
         }
-        myfile.close();
+        myfile1.close();
+    }
+    else cout << "Unable to open file";
+
+    ofstream myfile2("base.txt");
+    if (myfile2.is_open())
+    {
+        for(int count = 0; count < k; count++){
+            myfile2 <<a[count]<< "\n";
+        }
+        myfile2.close();
     }
     else cout << "Unable to open file";
 
     free(a);
-    free(b);
     return 0;
 }
