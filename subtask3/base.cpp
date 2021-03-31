@@ -33,7 +33,6 @@ vector<Point2f> src_points; //to store 4-coordinates
 | method to calculate the magnitude of image after |
 | applying threshold                               |
 --------------------------------------------------*/
-
 ul cal_magnitude(Mat diff){
     mag_g = 0;
     float threshold = 30.0f;
